@@ -136,39 +136,79 @@ def get_gemini_client():
     return genai.Client()
 
 def rerank_with_gemini(candidates, mood):
-    """Ask Gemini to re-rank `candidates` by fit to the user's mood. Returns a
-    list of `Pick`. Raises on auth/network errors so the caller can surface
-    them in the UI."""
-    client = get_gemini_client()
-    if client is None:
+    """Ask Gemini to re-rank candidates using an updated HTTP request 
+    that correctly formats the new secure AQ. Bearer Token.
+    """
+    import json
+    import os
+    import requests
+    import streamlit as st
+
+    # 1. Grab the key from Streamlit secrets
+    api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    if not api_key:
         raise RuntimeError("Gemini API key not configured.")
 
-    # Since Books.csv doesn't have genres, we simplify the catalog 
-    # to just a clean list of book titles for the prompt.
-    catalog = "\n".join(
-        f"- {c['title']}"
-        for c in candidates
-    )
+    # Clean any unintended trailing whitespaces or line breaks from the key string
+    api_key = api_key.strip()
 
-    system_instruction = (
-        "You are a book concierge. The candidate books below were already "
-        "picked for this user by collaborative filtering. Re-rank them by how "
-        "well they fit the user's request, best first, and give each a "
-        "one-sentence reason. Use the exact titles from the list and keep "
-        "every candidate."
-    )
+    # 2. Build the book catalog list for the prompt
+    catalog = "\n".join([f"- {c['title']}" for c in candidates])
 
-    # Send just the mood and the list of titles to Gemini
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=f"User's request: {mood}\n\nBooks:\n{catalog}",
-        config={
-            "system_instruction": system_instruction,
-            "response_mime_type": "application/json",
-            "response_schema": list[Pick],
+    # 3. Target the official endpoint WITHOUT passing the "?key=" parameter
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+
+    # 4. Create the payload enforcing JSON output matching your Pick schema
+    payload = {
+        "contents": [{
+            "parts": [{
+                "text": f"User's request: {mood}\n\nBooks:\n{catalog}"
+            }]
+        }],
+        "systemInstruction": {
+            "parts": [{
+                "text": (
+                    "You are a book concierge. The candidate books below were already picked "
+                    "for this user by collaborative filtering. Re-rank them by how well they fit "
+                    "the user's request, best first, and give each a one-sentence reason. "
+                    "Return the data strictly as a JSON array of objects, where each object has "
+                    "the keys 'title' and 'reason'."
+                )
+            }]
         },
-    )
-    return response.parsed
+        "generationConfig": {
+            "responseMimeType": "application/json"
+        }
+    }
+
+    # 5. CRITICAL FIX: Pass the AQ. key strictly as a standard Bearer token
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    # 6. Execute the network request
+    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    
+    if response.status_code != 200:
+        raise RuntimeError(f"Gemini API Error ({response.status_code}): {response.text}")
+
+    # 7. Parse the raw JSON out of Gemini's response layout
+    response_data = response.json()
+    try:
+        raw_text_output = response_data["candidates"][0]["content"]["parts"][0]["text"]
+        parsed_json = json.loads(raw_text_output)
+        
+        # Turn the raw dict array into objects that mimic your original `Pick` structure
+        class PickObject:
+            def __init__(self, d):
+                self.title = d.get("title", "Unknown Title")
+                self.reason = d.get("reason", "")
+
+        return [PickObject(item) for item in parsed_json]
+        
+    except (KeyError, IndexError, json.JSONDecodeError) as e:
+        raise RuntimeError(f"Failed to parse Gemini output: {e}")
 
 
 # ------------------------------------------------------------------- UI ----
