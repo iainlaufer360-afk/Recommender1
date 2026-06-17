@@ -135,28 +135,25 @@ def rerank_with_gemini(candidates, mood):
     if client is None:
         raise RuntimeError("Gemini API key not configured.")
 
-    # Look up each candidate's genres for the prompt. The recommender does not
-    # carry genres, so we fetch them here without touching the rec-sys code.
-    books, _, _ = load_data()
-    genres_of = dict(zip(books["book_id"], books["genres"].fillna("")))
+    # Since Books.csv doesn't have genres, we simplify the catalog 
+    # to just a clean list of book titles for the prompt.
     catalog = "\n".join(
-        f"- {c['title']} [{genres_of.get(c['book_id'], '') or 'unknown'}]"
+        f"- {c['title']}"
         for c in candidates
     )
 
     system_instruction = (
-        "You are a book concierge. The candidate movies below were already "
+        "You are a book concierge. The candidate books below were already "
         "picked for this user by collaborative filtering. Re-rank them by how "
         "well they fit the user's request, best first, and give each a "
         "one-sentence reason. Use the exact titles from the list and keep "
         "every candidate."
     )
 
-    # contents carries the user-side input; the schema and JSON mode live on
-    # config. response.parsed returns the list[Pick] objects directly.
+    # Send just the mood and the list of titles to Gemini
     response = client.models.generate_content(
         model=GEMINI_MODEL,
-        contents=f"User's request: {mood}\n\nMovies:\n{catalog}",
+        contents=f"User's request: {mood}\n\nBooks:\n{catalog}",
         config={
             "system_instruction": system_instruction,
             "response_mime_type": "application/json",
