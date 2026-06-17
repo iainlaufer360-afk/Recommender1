@@ -40,7 +40,12 @@ st.set_page_config(
 def load_data():
     """Load the Books/Ratings CSVs and build a book_id -> title lookup."""
     books = pd.read_csv("Books.csv")
-    ratings = pd.read_csv("Ratings.csv")
+    ratings = pd.read_csv(
+    ("Ratings.csv"), 
+    encoding="utf-8-sig", 
+    lineterminator="\n"
+    )
+    ratings.columns = ratings.columns.str.replace("\r", "").str.strip()
     title_of = dict(zip(books["book_id"], books["title"]))
     return books, ratings, title_of
 
