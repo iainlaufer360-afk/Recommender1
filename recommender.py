@@ -64,11 +64,7 @@ def fit_ubcf_model():
     data = Dataset.load_from_df(ratings[["book_id", "user_id", "rating"]], reader)
     trainset = data.build_full_trainset()
 
-    model = KNNBasic(
-        k=50,
-        sim_options={"name": "pearson", "user_based": True},
-        verbose=False,
-    )
+    model = BaselineOnly(verbose=False)
     model.fit(trainset)
     return model
 
