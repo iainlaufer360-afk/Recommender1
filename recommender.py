@@ -8,7 +8,7 @@ Original file is located at
 """
 
 # Commented out IPython magic to ensure Python compatibility.
-!pip install streamlit scikit-surprise
+#!pip install streamlit scikit-surprise
 # %pip install "numpy<2.0"
 # %pip install scikit-surprise
 
