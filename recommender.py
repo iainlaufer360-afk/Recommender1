@@ -38,14 +38,20 @@ st.set_page_config(
 
 @st.cache_data
 def load_data():
-    """Load the Books/Ratings CSVs and build a book_id -> title lookup."""
-    books = pd.read_csv("Books.csv")
-    ratings = pd.read_csv(
-    ("Ratings.csv"), 
-    encoding="utf-8-sig", 
-    lineterminator="\n"
-    )
+    """Load the Books/Ratings CSVs safely and build a book_id -> title lookup."""
+    # Handle line endings and drop hidden BOM/spaces from column headers
+    books = pd.read_csv("Books.csv", encoding="utf-8-sig", lineterminator="\n")
+    ratings = pd.read_csv("Ratings.csv", encoding="utf-8-sig", lineterminator="\n")
+    
+    books.columns = books.columns.str.replace("\r", "").str.strip()
     ratings.columns = ratings.columns.str.replace("\r", "").str.strip()
+    
+    # Strip carriage returns and whitespace from text data strings
+    if "title" in books.columns:
+        books["title"] = books["title"].str.replace("\r", "").str.strip()
+    if "genres" in books.columns:
+        books["genres"] = books["genres"].str.replace("\r", "").str.strip()
+
     title_of = dict(zip(books["book_id"], books["title"]))
     return books, ratings, title_of
 
