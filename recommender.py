@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-import os
 import json
-import requests
+import os
 
-import streamlit as st
 import pandas as pd
+import requests
+import streamlit as st
 from pydantic import BaseModel, Field
-from surprise import Dataset, Reader, BaselineOnly
+from surprise import BaselineOnly, Dataset, Reader
 
 # ---------------------------------------------------------------- page setup
 st.set_page_config(
@@ -15,11 +15,14 @@ st.set_page_config(
     layout="wide",
 )
 
+
 # ------------------------------------------------------------ data and model
 @st.cache_data
 def load_data():
     books = pd.read_csv("Books.csv", encoding="utf-8-sig", lineterminator="\n")
-    ratings = pd.read_csv("Ratings.csv", encoding="utf-8-sig", lineterminator="\n")
+    ratings = pd.read_csv(
+        "Ratings.csv", encoding="utf-8-sig", lineterminator="\n"
+    )
 
     books.columns = books.columns.str.replace("\r", "").str.strip()
     ratings.columns = ratings.columns.str.replace("\r", "").str.strip()
@@ -37,7 +40,9 @@ def load_data():
 def fit_ubcf_model():
     _, ratings, _ = load_data()
     reader = Reader(rating_scale=(0.5, 5.0))
-    data = Dataset.load_from_df(ratings[["book_id", "user_id", "rating"]], reader)
+    data = Dataset.load_from_df(
+        ratings[["book_id", "user_id", "rating"]], reader
+    )
     trainset = data.build_full_trainset()
     model = BaselineOnly(verbose=False)
     model.fit(trainset)
@@ -89,32 +94,38 @@ def rerank_with_gemini(candidates, mood):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
     payload = {
-        "contents": [{
-            "parts": [{
-                "text": f"User's request: {mood}\n\nBooks:\n{catalog}"
-            }]
-        }],
+        "contents": [
+            {
+                "parts": [
+                    {"text": f"User's request: {mood}\n\nBooks:\n{catalog}"}
+                ]
+            }
+        ],
         "systemInstruction": {
-            "parts": [{
-                "text": (
-                    "You are a book concierge. The candidate books below were already picked "
-                    "for this user by collaborative filtering. Re-rank them by how well they fit "
-                    "the user's request, best first, and give each a one-sentence reason. "
-                    "Return the data strictly as a JSON array of objects, where each object has "
-                    "the keys 'title' and 'reason'."
-                )
-            }]
+            "parts": [
+                {
+                    "text": (
+                        "You are a book concierge. The candidate books below were already picked "
+                        "for this user by collaborative filtering. Re-rank them by how well they fit "
+                        "the user's request, best first, and give each a one-sentence reason. "
+                        "Return the data strictly as a JSON array of objects, where each object has "
+                        "the keys 'title' and 'reason'."
+                    )
+                }
+            ]
         },
-        "generationConfig": {
-            "responseMimeType": "application/json"
-        }
+        "generationConfig": {"responseMimeType": "application/json"},
     }
 
     headers = {"Content-Type": "application/json"}
-    response = requests.post(url, headers=headers, params={"key": api_key}, data=json.dumps(payload))
+    response = requests.post(
+        url, headers=headers, params={"key": api_key}, data=json.dumps(payload)
+    )
 
     if response.status_code != 200:
-        raise RuntimeError(f"Gemini API Error ({response.status_code}): {response.text}")
+        raise RuntimeError(
+            f"Gemini API Error ({response.status_code}): {response.text}"
+        )
 
     response_data = response.json()
     try:
@@ -122,6 +133,7 @@ def rerank_with_gemini(candidates, mood):
         parsed = json.loads(raw_text)
 
         class Pick:
+
             def __init__(self, d):
                 self.title = d.get("title", "Unknown Title")
                 self.reason = d.get("reason", "")
@@ -151,7 +163,9 @@ with st.sidebar:
         value=str(min_id),
         help="Enter the ID of the user you want recommendations for.",
     )
-    st.caption(f"Valid IDs: {min_id}–{max_id} · {len(user_ids)} users in the dataset")
+    st.caption(
+        f"Valid IDs: {min_id}–{max_id} · {len(user_ids)} users in the dataset"
+    )
 
     min_ratings = st.slider(
         "Minimum ratings per book",
@@ -181,7 +195,9 @@ st.subheader(f"Top 10 recommendations for user {user_id}")
 recs = recommend(ubcf, user_id, min_ratings, top_n=10)
 
 if not recs:
-    st.warning("No books pass the filter — try lowering the minimum rating count.")
+    st.warning(
+        "No books pass the filter — try lowering the minimum rating count."
+    )
     st.session_state.pop("candidates", None)
 else:
     rec_df = pd.DataFrame([
@@ -236,9 +252,25 @@ if "candidates" in st.session_state:
         else:
             with st.spinner("Asking Gemini to re-rank…"):
                 try:
-                    result = rerank_with_gemini(st.session_state["candidates"], mood.strip())
+                    result = rerank_with_gemini(
+                        st.session_state["candidates"], mood.strip()
+                    )
+
+                    # Create a quick lookup map of { book_title: predicted_score } from session state
+                    pred_lookup = {
+                        c["title"]: c["predicted"]
+                        for c in st.session_state["candidates"]
+                    }
+
+                    # Build the new DataFrame with the mapped column included
                     out_df = pd.DataFrame([
-                        {"Book": m.title, "Why it fits": m.reason}
+                        {
+                            "Book": m.title,
+                            "Predicted (this user)": round(
+                                pred_lookup.get(m.title, 0.0), 2
+                            ),
+                            "Why it fits": m.reason,
+                        }
                         for m in result
                     ])
                     out_df.index = out_df.index + 1
