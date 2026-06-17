@@ -112,7 +112,7 @@ GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 @st.cache_resource
 def get_gemini_client():
-    """Return a configured Gen AI client using the new AQ. key format.
+    """Return a configured Gen AI client compatible with the new AQ. key format.
     Looks first at st.secrets, then at the GEMINI_API_KEY env var.
     """
     api_key = None
@@ -125,8 +125,8 @@ def get_gemini_client():
     if not api_key:
         return None
         
-    # Explicitly force the client to target the standard developer API 
-    # and pass the AQ. key properly via the HTTP headers.
+    # Force the SDK to pass the AQ. key via the explicit x-goog-api-key header
+    # and lock it to the standard v1beta developer API endpoint.
     return genai.Client(
         api_key=api_key,
         http_options=HttpOptions(
