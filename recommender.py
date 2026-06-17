@@ -112,23 +112,27 @@ GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 @st.cache_resource
 def get_gemini_client():
-    """Injects the key into the OS environment variables to fix the AQ. key bug."""
+    """Bypasses the AQ. key bug by forcing Streamlit secrets 
+    directly into the machine's native OS environment variables.
+    """
     api_key = None
     try:
         api_key = st.secrets.get("GEMINI_API_KEY")
     except (FileNotFoundError, KeyError):
         pass
     
+    # Fallback check
     api_key = api_key or os.environ.get("GEMINI_API_KEY")
     if not api_key:
         return None
         
-    # FORCE the key directly into the OS environment variables.
-    # The SDK automatically scans these when instantiated without parameters.
+    # INJECT the key into the machine's global environment variables.
+    # This instructs the underlying transport layer to treat the AQ. key
+    # as a direct, unrestricted Developer API key.
     os.environ["GEMINI_API_KEY"] = api_key
     
-    # Return a completely blank initialization. This forces the SDK 
-    # to treat your AQ. key as a raw, direct developer API key.
+    # Initialize a completely empty client. It will automatically scan
+    # the environment variable we just injected and route correctly.
     return genai.Client()
 
 def rerank_with_gemini(candidates, mood):
