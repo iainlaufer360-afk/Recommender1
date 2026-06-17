@@ -19,7 +19,7 @@ import pandas as pd
 from google import genai
 from pydantic import BaseModel, Field
 from surprise import KNNBasic, Dataset, Reader, BaselineOnly
-
+from google.genai.types import HttpOptions
 
 # ---------------------------------------------------------------- page setup
 st.set_page_config(
@@ -109,10 +109,6 @@ class Pick(BaseModel):
 # Same model as the demo: gemini-2.5-flash-lite has generous free limits and is
 # plenty for this small re-ranking task.
 GEMINI_MODEL = "gemini-2.5-flash-lite"
-
-
-@st.cache_resource
-from google.genai.types import HttpOptions # Add this import at the top of your file
 
 @st.cache_resource
 def get_gemini_client():
