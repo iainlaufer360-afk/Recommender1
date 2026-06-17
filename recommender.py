@@ -213,7 +213,7 @@ def rerank_with_gemini(candidates, mood):
 
 # ------------------------------------------------------------------- UI ----
 st.title("🎬 Book Recommender")
-st.caption("User-Based Collaborative Filtering on MovieLens")
+st.caption("Global+User+Item means on Books")
 
 with st.spinner("Loading data and fitting UBCF model…"):
     books, ratings, title_of = load_data()
