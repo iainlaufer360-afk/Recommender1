@@ -18,7 +18,7 @@ import streamlit as st
 import pandas as pd
 from google import genai
 from pydantic import BaseModel, Field
-from surprise import KNNBasic, Dataset, Reader
+from surprise import KNNBasic, Dataset, Reader, BaselineOnly
 
 
 # ---------------------------------------------------------------- page setup
