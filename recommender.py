@@ -112,9 +112,7 @@ GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 @st.cache_resource
 def get_gemini_client():
-    """Return a configured Gen AI client compatible with the new AQ. key format.
-    Looks first at st.secrets, then at the GEMINI_API_KEY env var.
-    """
+    """Injects the key into the OS environment variables to fix the AQ. key bug."""
     api_key = None
     try:
         api_key = st.secrets.get("GEMINI_API_KEY")
@@ -125,15 +123,13 @@ def get_gemini_client():
     if not api_key:
         return None
         
-    # Force the SDK to pass the AQ. key via the explicit x-goog-api-key header
-    # and lock it to the standard v1beta developer API endpoint.
-    return genai.Client(
-        api_key=api_key,
-        http_options=HttpOptions(
-            api_version="v1beta",
-            headers={"x-goog-api-key": api_key}
-        )
-    )
+    # FORCE the key directly into the OS environment variables.
+    # The SDK automatically scans these when instantiated without parameters.
+    os.environ["GEMINI_API_KEY"] = api_key
+    
+    # Return a completely blank initialization. This forces the SDK 
+    # to treat your AQ. key as a raw, direct developer API key.
+    return genai.Client()
 
 def rerank_with_gemini(candidates, mood):
     """Ask Gemini to re-rank `candidates` by fit to the user's mood. Returns a
