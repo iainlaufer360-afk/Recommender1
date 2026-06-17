@@ -1,6 +1,6 @@
 # `secrets.toml` is read automatically by Streamlit and exposed via st.secrets.
 # Keep `secrets.toml` out of git — only `secrets.toml.example` belongs in the repo.
 
-GEMINI_API_KEY = "AIzaSyBavba4_7k48UZtwI5Gey2tgihqaUulzAg"
+GEMINI_API_KEY = "AQ.Ab8RN6Lxgs-TMI_zi4ADrIy0NMnnP2aO4MIs77cs8QsD8RL5Iw"
 
 #ANTHROPIC_API_KEY = "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"
